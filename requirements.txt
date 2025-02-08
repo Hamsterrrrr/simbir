@@ -1,0 +1,7 @@
+allure-pytest==2.13.5
+allure-python-commons==2.13.5
+pytest==8.3.4
+selenium==4.28.1
+pandas==2.2.3
+webdriver-manager==4.0.2
+websocket-client==1.8.0

@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  selenium-hub:
+    image: selenium/hub:4.10.0
+    container_name: selenium-hub
+    ports:
+      - "4444:4444"
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:4444/wd/hub/status"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  firefox:
+    image: selenium/node-firefox:4.10.0
+    container_name: firefox
+    shm_size: 2gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+
+  tests:
+    build: .
+    container_name: tests
+    depends_on:
+      - selenium-hub
+      - firefox
+    environment:
+      - SELENIUM_HOST=selenium-hub
+      - SELENIUM_PORT=4444
+    volumes:
+      - ./allure-results:/app/allure-results    # Результаты тестов
+      - ./allure-history:/app/allure-history      # Папка для сохранения истории
+      - ./allure-report:/app/allure-report        # Для сохранения итогового отчёта
+    command: >
+      sh -c "if [ -d /app/allure-history ]; then mkdir -p /app/allure-results/history && cp -r /app/allure-history/* /app/allure-results/history; fi;
+              until curl -s http://selenium-hub:4444/wd/hub/status | grep 'ready'; do
+                  echo 'Waiting for Selenium Hub to be ready...'; sleep 2; done;
+              pytest --alluredir=/app/allure-results"
+
+  allure:
+    image: "frankescobar/allure-docker-service"
+    user: root 
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./allure-history:/app/allure-history
+      - ./allure-report:/app/allure-report
+    environment:
+      CHECK_RESULTS_EVERY_SECONDS: 1
+      KEEP_HISTORY: 1
+    ports:
+      - "5050:5050"
+
+  allure-ui:
+    image: "frankescobar/allure-docker-service-ui"
+    environment:
+      ALLURE_DOCKER_PUBLIC_API_URL: "http://localhost:5050"
+      ALLURE_DOCKER_PUBLIC_API_URL_PREFIX: ""
+    ports:
+      - "5252:5252"
